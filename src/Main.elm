@@ -483,8 +483,12 @@ view mainModel =
                             , SvgAttr.height cellHPxStr
                             , SvgAttr.stroke "gray"
                             , SvgAttr.strokeWidth "0.5"
-                            , SvgAttr.fill "none"
+
+                            --, SvgAttr.fill "none"
                             , SvgAttr.opacity "0.8"
+
+                            -- lavender blue
+                            , SvgAttr.fill "#CED8F7"
                             ]
                             []
                         ]
@@ -574,16 +578,15 @@ renderPlacedCell mainGrid placement tileCardSizeInCells idxInTileCard cell =
             { defaultGridRect
                 | start = absStartInPixels
                 , size = mainGrid.cellSizeInPixels
-                , strokeColor = "slategrey"
-                , strokeOpacity = 0.8
+                , strokeColor = "dimgray"
+                , strokeOpacity = 0.2
                 , fillColor =
                     case cell of
                         Open ->
-                            -- lavender blue
-                            "#CED8F7"
+                            "WhiteSmoke"
 
                         Closed ->
-                            "slategrey"
+                            "dimgray"
             }
     in
     cellRectAbs cellRect [] []
@@ -617,7 +620,7 @@ renderMainGridPlacedTileCards : MainModel -> Svg msg
 renderMainGridPlacedTileCards model =
     let
         -- naive implementation with a simple map, when and output an empty Element for an empty tilecard
-        {- filterAndMap : Maybe TileCardPlacement -> List ( TileCardPlacement, TileCard ) -> List ( TileCardPlacement, TileCard ) -}
+        filterAndMap : (( { a | tileCardId : Int }, TileCard ) -> b) -> Maybe { a | tileCardId : Int } -> List b -> List b
         filterAndMap renderF placement acc =
             case placement of
                 Just placed ->
@@ -909,7 +912,7 @@ renderCell tileCardId idx cellType cellSizeInPx tileWidthInCells mouseOverCellIn
                             SvgAttr.fill "WhiteSmoke"
 
                         Closed ->
-                            SvgAttr.fill "DarkGray"
+                            SvgAttr.fill "dimgray"
 
             Nothing ->
                 case cellType of
@@ -917,7 +920,7 @@ renderCell tileCardId idx cellType cellSizeInPx tileWidthInCells mouseOverCellIn
                         SvgAttr.fill "WhiteSmoke"
 
                     Closed ->
-                        SvgAttr.fill "DarkGray"
+                        SvgAttr.fill "dimgray"
         , SvgAttr.strokeWidth "0.5"
         , SvgAttr.stroke "Gray"
         , Svg.Events.onMouseOver (MouseOverHighlightCellInTileCardUpdate { tileCardId = tileCardId, cellCoord = cellCoords })

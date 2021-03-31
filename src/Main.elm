@@ -37,10 +37,14 @@ getGridPointForIndex idx widthInCells =
     { x = x, y = y }
 
 
+defaultTilCardDesignSizeInCells =
+    { width = 3, height = 3 }
+
+
 emptyDefaultTileCard : TileCard
 emptyDefaultTileCard =
     { id = 99
-    , sizeInCells = { width = 3, height = 3 }
+    , sizeInCells = defaultTilCardDesignSizeInCells
     , cells =
         Array.fromList
             [ Open
@@ -54,10 +58,6 @@ emptyDefaultTileCard =
             , Open
             ]
     }
-
-
-defaultTilCardDesignSizeInCells =
-    { width = 3, height = 3 }
 
 
 createTileCardDesignKv id cells =

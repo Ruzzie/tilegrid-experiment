@@ -72,11 +72,12 @@ createTileCardDesignKv id cells =
 initTileCardDesigns =
     Dict.fromList
         [ ( emptyDefaultTileCard.id, emptyDefaultTileCard )
-        , createTileCardDesignKv 1 [ Closed, Closed, Closed, Open, Open, Open, Closed, Closed, Closed ]
-        , createTileCardDesignKv 2 [ Closed, Closed, Closed, Open, Open, Open, Closed, Closed, Open ]
-        , createTileCardDesignKv 3 [ Closed, Open, Closed, Open, Open, Open, Open, Closed, Closed ]
-        , createTileCardDesignKv 4 [ Open, Open, Open, Open, Closed, Open, Open, Closed, Open ]
-        , createTileCardDesignKv 5 [ Closed, Closed, Closed, Open, Open, Closed, Open, Open, Closed ]
+        , createTileCardDesignKv 2 [ Open, Open, Open, Closed, Closed, Closed, Open, Open, Open ]
+        , createTileCardDesignKv 3 [ Open, Open, Open, Closed, Closed, Open, Closed, Closed, Open ]
+        , createTileCardDesignKv 4 [ Open, Open, Open, Closed, Closed, Open, Open, Closed, Open ]
+        , createTileCardDesignKv 5 [ Closed, Closed, Closed, Closed, Closed, Closed, Open, Open, Open ]
+        , createTileCardDesignKv 6 [ Open, Open, Closed, Closed, Open, Closed, Open, Open, Open ]
+        , createTileCardDesignKv 6 [ Open, Open, Closed, Closed, Open, Open, Closed, Closed, Open ]
         ]
 
 
@@ -688,7 +689,7 @@ renderPlacedCell mainGrid placement tileCardSizeInCells idxInTileCard cell =
                             "WhiteSmoke"
 
                         Closed ->
-                            "dimgray"
+                            "#0A0A0A"
             }
     in
     cellRectAbs cellRect [] []
@@ -710,6 +711,7 @@ renderPlacedTileCardOnMainGrid mainGrid ( placement, tileCard ) =
                     , height = tileCard.sizeInCells.height * mainGrid.cellSizeInPixels.height
                     }
                 , strokeColor = "royalblue"
+                , strokeOpacity = 0.7
                 , strokeWidth = 4
                 , opacity = 0.8
                 , rotation = placement.rotation
@@ -769,6 +771,8 @@ cellRectAbs gridRectInPx attrs inner =
                  , SvgAttr.strokeWidth <| String.fromFloat gridRectInPx.strokeWidth
                  , SvgAttr.stroke <| gridRectInPx.strokeColor
                  , SvgAttr.strokeOpacity <| String.fromFloat gridRectInPx.strokeOpacity
+                 , SvgAttr.strokeLinecap "butt"
+                 , SvgAttr.strokeDasharray "8,4"
                  , SvgAttr.fill <| gridRectInPx.fillColor
                  ]
                     ++ attrs

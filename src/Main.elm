@@ -107,9 +107,7 @@ keyDecoder =
 
 
 type UpdateMsg
-    = Something
-    | AnotherThing
-    | MouseOverHighlightCellInTileCardUpdate TileCardSelectedCell
+    = MouseOverHighlightCellInTileCardUpdate TileCardSelectedCell
     | ClearMouseOverCellInTileCard
     | ToggleCellTypeInTileCard TileCardSelectedCell
     | CopyTileCardDesign TileCard
@@ -120,6 +118,7 @@ type UpdateMsg
     | MouseLeaveMainGrid
     | MouseClickMainGrid MainGridAction
     | KeyPressed String
+    | ChangeTool MainGridTool
 
 
 type CellType
@@ -161,6 +160,7 @@ type MainGridAction
 type MainGridTool
     = PlaceSelectionTool
     | Random
+    | DeleteTool
     | Select
 
 
@@ -220,11 +220,15 @@ pointToTileCardCoordinates point cellSizeInPx tileCardSizeInCells =
 update : UpdateMsg -> MainModel -> ( MainModel, Cmd UpdateMsg )
 update updateMsg model =
     case updateMsg of
-        Something ->
-            ( model, Cmd.none )
+        ChangeTool toTool ->
+            let
+                oldMainGrid =
+                    model.mainGrid
 
-        AnotherThing ->
-            ( model, Cmd.none )
+                updatedMainGrid =
+                    { oldMainGrid | tool = toTool }
+            in
+            ( { model | mainGrid = updatedMainGrid }, Cmd.none )
 
         MouseOverHighlightCellInTileCardUpdate tileCardSelectedCell ->
             ( { model | mouseOverCellInTileCard = Just tileCardSelectedCell }, Cmd.none )
@@ -301,26 +305,35 @@ update updateMsg model =
                                         idxInArray =
                                             indexForCoord model.mainGrid.sizeInTileCards.width coords.absTileCardCoord
 
-                                        updatedGridArray =
-                                            Array.set idxInArray
+                                        updatedMainGrid =
+                                            updateMainGridTileCardsArray idxInArray
                                                 (Just
                                                     { tileCardId = tileCard.id
                                                     , tileCardStartPx = coords.absTileCardStartInPx
                                                     , rotation = model.mainGrid.currentTileCardRotation
                                                     }
                                                 )
-                                                model.mainGrid.tileCards
-
-                                        oldMainGrid =
-                                            model.mainGrid
-
-                                        updatedMainGrid =
-                                            { oldMainGrid | tileCards = updatedGridArray }
+                                                model.mainGrid
                                     in
                                     ( { model | mainGrid = updatedMainGrid }, Cmd.none )
 
                                 Nothing ->
                                     ( model, Cmd.none )
+
+                        DeleteTool ->
+                            let
+                                coords =
+                                    pointToTileCardCoordinates ( actionCoordInPixels.x, actionCoordInPixels.y ) model.mainGrid.cellSizeInPixels model.mainGrid.tileCardSizeInCells
+
+                                idxInArray =
+                                    indexForCoord model.mainGrid.sizeInTileCards.width coords.absTileCardCoord
+
+                                updatedMainGrid =
+                                    updateMainGridTileCardsArray idxInArray
+                                        Nothing
+                                        model.mainGrid
+                            in
+                            ( { model | mainGrid = updatedMainGrid }, Cmd.none )
 
                         _ ->
                             ( model, Cmd.none )
@@ -329,24 +342,42 @@ update updateMsg model =
                     ( model, Cmd.none )
 
         KeyPressed key ->
-            if key == "]" then
-                -- add rotate 90 deg
-                case model.mainGrid.tileIdToShowAtCursor of
-                    Just tileCardId ->
-                        let
-                            oldGrid =
-                                model.mainGrid
+            case key of
+                "]" ->
+                    -- add rotate 90 deg
+                    case model.mainGrid.tileIdToShowAtCursor of
+                        Just tileCardId ->
+                            let
+                                oldGrid =
+                                    model.mainGrid
 
-                            rotation =
-                                modBy 360 (model.mainGrid.currentTileCardRotation + 90)
-                        in
-                        ( { model | mainGrid = { oldGrid | currentTileCardRotation = rotation } }, Cmd.none )
+                                rotation =
+                                    modBy 360 (model.mainGrid.currentTileCardRotation + 90)
+                            in
+                            ( { model | mainGrid = { oldGrid | currentTileCardRotation = rotation } }, Cmd.none )
 
-                    Nothing ->
-                        ( model, Cmd.none )
+                        Nothing ->
+                            ( model, Cmd.none )
 
-            else
-                ( model, Cmd.none )
+                "p" ->
+                    update (ChangeTool PlaceSelectionTool) model
+
+                "d" ->
+                    update (ChangeTool DeleteTool) model
+
+                _ ->
+                    ( model, Cmd.none )
+
+
+updateMainGridTileCardsArray idx placementMaybe mainGrid =
+    let
+        updatedGridArray =
+            Array.set idx placementMaybe mainGrid.tileCards
+
+        updatedMainGrid =
+            { mainGrid | tileCards = updatedGridArray }
+    in
+    updatedMainGrid
 
 
 updateTileCellType : TileCardSelectedCell -> TileCard -> TileCard
@@ -384,6 +415,19 @@ indexForCoord widthInCells cellCoord =
     (widthInCells * cellCoord.y) + cellCoord.x
 
 
+toolToString : MainGridTool -> String
+toolToString tool =
+    case tool of
+        PlaceSelectionTool ->
+            "Place"
+
+        DeleteTool ->
+            "Delete"
+
+        _ ->
+            "?"
+
+
 view : MainModel -> Html UpdateMsg
 view mainModel =
     let
@@ -399,6 +443,21 @@ view mainModel =
     div []
         [ viewTileCardsOverView mainModel.cardDesigns mainModel.selectedTileCardId mainModel.cellSizeInPixels mainModel.mouseOverCellInTileCard
         , Html.Lazy.lazy viewMainGridDebugInfo mainModel.mainGrid
+        , span []
+            [ span [] [ Html.text <| "|Current: " ++ toolToString mainModel.mainGrid.tool ]
+            , span [] [ Html.text " |Tools: " ]
+            , if mainModel.mainGrid.tool == PlaceSelectionTool then
+                Html.button [ Html.Attributes.disabled True, Html.Attributes.style "border" "solid 2px magenta" ] [ Html.text "Place" ]
+
+              else
+                Html.button [ Html.Events.onClick (ChangeTool PlaceSelectionTool) ] [ Html.text "Place" ]
+            , if mainModel.mainGrid.tool == DeleteTool then
+                Html.button [ Html.Attributes.disabled True, Html.Attributes.style "border" "solid 2px red" ] [ Html.text "Delete" ]
+
+              else
+                Html.button [ Html.Events.onClick (ChangeTool DeleteTool) ] [ Html.text "Delete" ]
+            , span [] [ Html.text " Rotate: ']', Place tool: 'p' , Delete tool: 'd'" ]
+            ]
         , div []
             [ Svg.svg
                 {- https://stackoverflow.com/questions/14208673/how-to-draw-grid-using-html5-and-canvas-or-svg -}
@@ -460,20 +519,45 @@ view mainModel =
                     ]
                     []
                 , Svg.Lazy.lazy renderMainGridPlacedTileCards mainModel
-                , let
-                    selectedTileCard =
-                        Maybe.andThen (\id -> Dict.get id mainModel.cardDesigns) mainModel.selectedTileCardId
-                  in
-                  Maybe.withDefault (Svg.rect [] [])
-                    (Maybe.map2
-                        (renderSelectedTileCardInMainGrid
-                            mainModel.mainGrid.cellSizeInPixels
-                            mainModel.mainGrid.tileCardSizeInCells
-                            mainModel.mainGrid.currentTileCardRotation
-                        )
-                        mainModel.mainGrid.mouseAtPoint
-                        selectedTileCard
-                    )
+                , case mainModel.mainGrid.tool of
+                    PlaceSelectionTool ->
+                        let
+                            selectedTileCard =
+                                Maybe.andThen (\id -> Dict.get id mainModel.cardDesigns) mainModel.selectedTileCardId
+                        in
+                        Maybe.withDefault (Svg.rect [] [])
+                            (Maybe.map2
+                                (renderSelectedTileCardInMainGrid
+                                    mainModel.mainGrid.cellSizeInPixels
+                                    mainModel.mainGrid.tileCardSizeInCells
+                                    mainModel.mainGrid.currentTileCardRotation
+                                )
+                                mainModel.mainGrid.mouseAtPoint
+                                selectedTileCard
+                            )
+
+                    DeleteTool ->
+                        -- Show only outline
+                        let
+                            deleteSelectionOutlineRect ( mX, mY ) =
+                                let
+                                    tileCardSizeInPx =
+                                        { width = mainModel.mainGrid.cellSizeInPixels.width * mainModel.mainGrid.tileCardSizeInCells.width
+                                        , height = mainModel.mainGrid.cellSizeInPixels.height * mainModel.mainGrid.tileCardSizeInCells.height
+                                        }
+
+                                    coords =
+                                        pointToTileCardCoordinates ( mX, mY ) mainModel.mainGrid.cellSizeInPixels mainModel.mainGrid.tileCardSizeInCells
+
+                                    gridRect =
+                                        { defaultGridRect | start = coords.absTileCardStartInPx, size = tileCardSizeInPx, fillColor = "red", opacity = 0.7 }
+                                in
+                                cellRectAbs gridRect [] []
+                        in
+                        Maybe.withDefault (Svg.rect [] []) (Maybe.map deleteSelectionOutlineRect mainModel.mainGrid.mouseAtPoint)
+
+                    _ ->
+                        Svg.g [] []
                 ]
             ]
         ]

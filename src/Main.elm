@@ -88,7 +88,7 @@ mainGridDefaultSizeInTileCards =
 emptyDefaultMainGrid : MainGrid
 emptyDefaultMainGrid =
     { mouseAtPoint = Nothing
-    , cellSizeInPixels = { width = 64, height = 64 }
+    , cellSizeInPixels = { width = 32, height = 32 }
     , tileCardSizeInCells = emptyDefaultTileCard.sizeInCells
     , tileIdToShowAtCursor = Nothing
     , currentTileCardRotation = 0
@@ -259,8 +259,20 @@ selectRandomTileCardDesignNumber mainModel =
 
         design =
             Array.get randomIdx designsArray
+
+        ( randomRotationMultiply, nextSeed1 ) =
+            Random.step (Random.int 0 3) nextSeed
+
+        randomRotation =
+            randomRotationMultiply * 90
+
+        oldGrid =
+            mainModel.mainGrid
+
+        gridWithUpdatedRotation =
+            { oldGrid | currentTileCardRotation = randomRotation }
     in
-    { mainModel | seed = nextSeed, selectedTileCardId = Maybe.map (\d -> d.id) design }
+    { mainModel | seed = nextSeed1, selectedTileCardId = Maybe.map (\d -> d.id) design, mainGrid = gridWithUpdatedRotation }
 
 
 update : UpdateMsg -> MainModel -> ( MainModel, Cmd UpdateMsg )
@@ -681,15 +693,21 @@ renderPlacedCell mainGrid placement tileCardSizeInCells idxInTileCard cell =
             { defaultGridRect
                 | start = absStartInPixels
                 , size = mainGrid.cellSizeInPixels
-                , strokeColor = "dimgray"
-                , strokeOpacity = 0.2
+                , strokeColor =
+                    case cell of
+                        Open ->
+                            "dimgray"
+
+                        Closed ->
+                            "#1F1F2F"
+                , strokeOpacity = 0.5
                 , fillColor =
                     case cell of
                         Open ->
                             "WhiteSmoke"
 
                         Closed ->
-                            "#0A0A0A"
+                            "#3F3F4F"
             }
     in
     cellRectAbs cellRect [] []
@@ -711,8 +729,8 @@ renderPlacedTileCardOnMainGrid mainGrid ( placement, tileCard ) =
                     , height = tileCard.sizeInCells.height * mainGrid.cellSizeInPixels.height
                     }
                 , strokeColor = "royalblue"
-                , strokeOpacity = 0.7
-                , strokeWidth = 4
+                , strokeOpacity = 0.65
+                , strokeWidth = 2
                 , opacity = 0.8
                 , rotation = placement.rotation
             }
@@ -772,7 +790,8 @@ cellRectAbs gridRectInPx attrs inner =
                  , SvgAttr.stroke <| gridRectInPx.strokeColor
                  , SvgAttr.strokeOpacity <| String.fromFloat gridRectInPx.strokeOpacity
                  , SvgAttr.strokeLinecap "butt"
-                 , SvgAttr.strokeDasharray "8,4"
+                 , SvgAttr.strokeLinejoin "bevel"
+                 , SvgAttr.strokeDasharray "4,2"
                  , SvgAttr.fill <| gridRectInPx.fillColor
                  ]
                     ++ attrs

@@ -47,15 +47,15 @@ emptyDefaultTileCard =
     , sizeInCells = defaultTilCardDesignSizeInCells
     , cells =
         Array.fromList
-            [ Open
-            , Open
-            , Open
-            , Open
-            , Open
-            , Open
-            , Open
-            , Open
-            , Open
+            [ Closed
+            , Closed
+            , Closed
+            , Closed
+            , Closed
+            , Closed
+            , Closed
+            , Closed
+            , Closed
             ]
     }
 
@@ -146,6 +146,7 @@ type UpdateMsg
     | MouseClickMainGrid MainGridAction
     | KeyPressed String
     | ChangeTool MainGridTool
+    | FillMainGridWithRandomTileCards
 
 
 type CellType
@@ -173,14 +174,14 @@ type alias TileCardSelectedCell =
     }
 
 
-type alias Point =
+type alias PointF =
     { x : Float
     , y : Float
     }
 
 
 type MainGridAction
-    = Primary Point
+    = Primary PointF
     | Secondary
 
 
@@ -245,17 +246,17 @@ pointToTileCardCoordinates point cellSizeInPx tileCardSizeInCells =
     }
 
 
-selectRandomTileCardDesignNumber : MainModel -> MainModel
-selectRandomTileCardDesignNumber mainModel =
+getRandomTileCardAndRotation : Random.Seed -> Dict k v -> ( Random.Seed, Int, Maybe v )
+getRandomTileCardAndRotation seed cardDesigns =
     let
         designsArray =
-            Array.fromList (Dict.values mainModel.cardDesigns)
+            Array.fromList (Dict.values cardDesigns)
 
         maxIdx =
             Array.length designsArray - 1
 
         ( randomIdx, nextSeed ) =
-            Random.step (Random.int 0 maxIdx) mainModel.seed
+            Random.step (Random.int 0 maxIdx) seed
 
         design =
             Array.get randomIdx designsArray
@@ -265,6 +266,15 @@ selectRandomTileCardDesignNumber mainModel =
 
         randomRotation =
             randomRotationMultiply * 90
+    in
+    ( nextSeed1, randomRotation, design )
+
+
+selectRandomTileCardDesignNumber : MainModel -> MainModel
+selectRandomTileCardDesignNumber mainModel =
+    let
+        ( nextSeed1, randomRotation, design ) =
+            getRandomTileCardAndRotation mainModel.seed mainModel.cardDesigns
 
         oldGrid =
             mainModel.mainGrid
@@ -429,6 +439,41 @@ update updateMsg model =
                 _ ->
                     ( model, Cmd.none )
 
+        FillMainGridWithRandomTileCards ->
+            let
+                currentMainGrid =
+                    model.mainGrid
+
+                ( updatedSeed, updatedWithRandomTileCards ) =
+                    List.foldl
+                        (\( idx, _ ) ( seed, items ) ->
+                            let
+                                ( seed1, rotation, designMaybe ) =
+                                    getRandomTileCardAndRotation seed model.cardDesigns
+
+                                p i design =
+                                    let
+                                        tileCardSizeInPx =
+                                            { width = currentMainGrid.cellSizeInPixels.width * design.sizeInCells.width
+                                            , height = currentMainGrid.cellSizeInPixels.height * design.sizeInCells.height
+                                            }
+                                    in
+                                    calcCellOffsetInPx (getGridPointForIndex i currentMainGrid.sizeInTileCards.width) tileCardSizeInPx
+
+                                placement : Maybe TileCardPlacement
+                                placement =
+                                    designMaybe |> Maybe.map (\d -> { tileCardId = d.id, tileCardStartPx = p idx d, rotation = rotation })
+                            in
+                            ( seed1, Array.set idx placement items )
+                        )
+                        ( model.seed, currentMainGrid.tileCards )
+                        (Array.toIndexedList currentMainGrid.tileCards)
+
+                updatedMainGrid =
+                    { currentMainGrid | tileCards = updatedWithRandomTileCards }
+            in
+            ( { model | seed = updatedSeed, mainGrid = updatedMainGrid }, Cmd.none )
+
         KeyPressed key ->
             case key of
                 "]" ->
@@ -460,6 +505,7 @@ update updateMsg model =
                     ( model, Cmd.none )
 
 
+updateMainGridTileCardsArray : Int -> Maybe TileCardPlacement -> MainGrid -> MainGrid
 updateMainGridTileCardsArray idx placementMaybe mainGrid =
     let
         updatedGridArray =
@@ -534,12 +580,12 @@ view mainModel =
         defaultTileCardGridSize =
             3
     in
-    div []
+    div [ Html.Attributes.style "background-color" "lightgray" ]
         [ viewTileCardsOverView mainModel.cardDesigns mainModel.selectedTileCardId mainModel.cellSizeInPixels mainModel.mouseOverCellInTileCard
         , Html.Lazy.lazy viewMainGridDebugInfo mainModel.mainGrid
         , span [ Html.Attributes.style "font-family" "monospace, monospaced" ]
             [ span [] [ Html.text <| "|Current: " ++ toolToString mainModel.mainGrid.tool ]
-            , span [] [ Html.text " |Tools: " ]
+            , span [] [ Html.text " |TileTools: " ]
             , if mainModel.mainGrid.tool == PlaceSelectionTool then
                 Html.button [ Html.Attributes.disabled True, Html.Attributes.style "border" "solid 2px magenta" ] [ Html.text "Place" ]
 
@@ -556,6 +602,10 @@ view mainModel =
               else
                 Html.button [ Html.Events.onClick (ChangeTool RandomTool) ] [ Html.text "Random" ]
             , span [] [ Html.text " Rotate: ']', Place tool: 'p' , Delete tool: 'd' , Random tool : 'r' " ]
+            ]
+        , span [ Html.Attributes.style "font-family" "monospace, monospaced" ]
+            [ span [] [ Html.text " |Grid Tools: " ]
+            , Html.button [ Html.Events.onClick FillMainGridWithRandomTileCards ] [ Html.text "Random Grid Fill" ]
             ]
         , div []
             [ Svg.svg
@@ -623,38 +673,6 @@ view mainModel =
                     []
                 , Svg.Lazy.lazy renderMainGridPlacedTileCards mainModel
                 , case mainModel.mainGrid.tool of
-                    RandomTool ->
-                        let
-                            selectedTileCard =
-                                Maybe.andThen (\id -> Dict.get id mainModel.cardDesigns) mainModel.selectedTileCardId
-                        in
-                        Maybe.withDefault (Svg.rect [] [])
-                            (Maybe.map2
-                                (renderSelectedTileCardInMainGrid
-                                    mainModel.mainGrid.cellSizeInPixels
-                                    mainModel.mainGrid.tileCardSizeInCells
-                                    mainModel.mainGrid.currentTileCardRotation
-                                )
-                                mainModel.mainGrid.mouseAtPoint
-                                selectedTileCard
-                            )
-
-                    PlaceSelectionTool ->
-                        let
-                            selectedTileCard =
-                                Maybe.andThen (\id -> Dict.get id mainModel.cardDesigns) mainModel.selectedTileCardId
-                        in
-                        Maybe.withDefault (Svg.rect [] [])
-                            (Maybe.map2
-                                (renderSelectedTileCardInMainGrid
-                                    mainModel.mainGrid.cellSizeInPixels
-                                    mainModel.mainGrid.tileCardSizeInCells
-                                    mainModel.mainGrid.currentTileCardRotation
-                                )
-                                mainModel.mainGrid.mouseAtPoint
-                                selectedTileCard
-                            )
-
                     DeleteTool ->
                         -- Show only outline
                         let
@@ -675,8 +693,22 @@ view mainModel =
                         in
                         Maybe.withDefault (Svg.rect [] []) (Maybe.map deleteSelectionOutlineRect mainModel.mainGrid.mouseAtPoint)
 
+                    -- RandomTool , PlaceSelectionTool
                     _ ->
-                        Svg.g [] []
+                        let
+                            selectedTileCard =
+                                Maybe.andThen (\id -> Dict.get id mainModel.cardDesigns) mainModel.selectedTileCardId
+                        in
+                        Maybe.withDefault (Svg.g [] [])
+                            (Maybe.map2
+                                (renderSelectedTileCardInMainGrid
+                                    mainModel.mainGrid.cellSizeInPixels
+                                    mainModel.mainGrid.tileCardSizeInCells
+                                    mainModel.mainGrid.currentTileCardRotation
+                                )
+                                mainModel.mainGrid.mouseAtPoint
+                                selectedTileCard
+                            )
                 ]
             ]
         ]
@@ -761,12 +793,6 @@ renderMainGridPlacedTileCards model =
     in
     Svg.g []
         tileCardsSvgs
-
-
-type alias PointF =
-    { x : Float
-    , y : Float
-    }
 
 
 centreOf : GridRect -> PointF

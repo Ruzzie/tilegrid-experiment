@@ -37,6 +37,16 @@ getGridPointForIndex idx widthInCells =
     { x = x, y = y }
 
 
+getAbsTileStartOnGridInPx gridCellSizeInPixels gridWidthInTileCards idx tileCardSizeInCells =
+    let
+        tileCardSizeInPx =
+            { width = gridCellSizeInPixels.width * tileCardSizeInCells.width
+            , height = gridCellSizeInPixels.height * tileCardSizeInCells.height
+            }
+    in
+    calcCellOffsetInPx (getGridPointForIndex idx gridWidthInTileCards) tileCardSizeInPx
+
+
 defaultTilCardDesignSizeInCells =
     { width = 3, height = 3 }
 
@@ -451,18 +461,17 @@ update updateMsg model =
                                 ( seed1, rotation, designMaybe ) =
                                     getRandomTileCardAndRotation seed model.cardDesigns
 
-                                p i design =
-                                    let
-                                        tileCardSizeInPx =
-                                            { width = currentMainGrid.cellSizeInPixels.width * design.sizeInCells.width
-                                            , height = currentMainGrid.cellSizeInPixels.height * design.sizeInCells.height
-                                            }
-                                    in
-                                    calcCellOffsetInPx (getGridPointForIndex i currentMainGrid.sizeInTileCards.width) tileCardSizeInPx
-
                                 placement : Maybe TileCardPlacement
                                 placement =
-                                    designMaybe |> Maybe.map (\d -> { tileCardId = d.id, tileCardStartPx = p idx d, rotation = rotation })
+                                    designMaybe
+                                        |> Maybe.map
+                                            (\d ->
+                                                { tileCardId = d.id
+                                                , tileCardStartPx =
+                                                    getAbsTileStartOnGridInPx currentMainGrid.cellSizeInPixels currentMainGrid.sizeInTileCards.width idx d.sizeInCells
+                                                , rotation = rotation
+                                                }
+                                            )
                             in
                             ( seed1, Array.set idx placement items )
                         )
